@@ -1,0 +1,334 @@
+Add Valve's QControllerEvent extension to Qt 6, extracted from the Steam Link
+Flatpak's qtbase patch and rebased on 6.11.1:
+
+  https://github.com/flathub/com.valvesoftware.SteamLink
+  patches/steamlink/qtbase.patch
+
+The prebuilt steamlink binary references QControllerEvent and the
+QWidget::controllerEvent() virtual, neither of which exist upstream. Only the
+controller event hunks are kept; the tvOS, virtual platform plugin and
+unrelated fixes from the original patch are dropped.
+
+Note that this inserts a virtual into QWidget, so the resulting libraries are
+NOT ABI compatible with a stock Qt build and must stay in a private directory.
+
+--- a/src/corelib/kernel/qcoreevent.h
++++ b/src/corelib/kernel/qcoreevent.h
+@@ -301,6 +301,8 @@
+         // 512 reserved for Qt Jambi's MetaCall event
+         // 513 reserved for Qt Jambi's DeleteOnMainThread event
+ 
++        Controller = 768,                       // Game controller state change
++
+         User = 1000,                            // first user event id
+         MaxUser = 65535                         // last user event id
+     };
+--- a/src/gui/kernel/qevent.cpp
++++ b/src/gui/kernel/qevent.cpp
+@@ -4964,6 +4964,70 @@
+     addPoint(this, point);
+ }
+ 
++/*!
++    Creates a new QControllerEvent.
++*/
++QControllerEvent::QControllerEvent()
++: QEvent(QEvent::Controller)
++{
++    m_type = NONE;
++    m_pressed = false;
++    m_angle = 0;
++    m_distance = 0;
++    m_direction = DIRECTION_CENTER;
++}
++
++/*!
++    Initialize a controller event as a button press
++*/
++void QControllerEvent::setButton(EventType button, bool pressed)
++{
++	m_type = button;
++	m_pressed = pressed;
++}
++
++/*!
++    Initialize a controller event as a dpad direction
++*/
++void QControllerEvent::setDPad(Direction direction)
++{
++    m_type = DPAD;
++    m_direction = direction;
++}
++
++/*!
++    Initialize a controller event as a thumbstick motion
++	The angle ranges from 0 to 2 * M_PI starting at the top and going clockwise.
++	The distance ranges from 0 to 1
++*/
++void QControllerEvent::setThumbstick(EventType thumbstick, qreal angle, qreal distance)
++{
++	m_type = thumbstick;
++    m_angle = angle;
++    m_distance = distance;
++
++    if (distance > 0.0) {
++        m_direction = DIRECTION_N;
++        qreal span = ((2 * M_PI)/8);
++        for (int i=0; i<8; ++i) {
++            if (angle >= ((i*span)-(span/2)) && angle <= ((i*span)+(span/2))) {
++                m_direction = (Direction)(1+i);
++                break;
++            }
++        }
++    }
++}
++
++/*!
++    Initialize a controller event as a trigger motion
++	The distance ranges from 0 to 1
++*/
++void QControllerEvent::setTrigger(EventType trigger, qreal distance)
++{
++	m_type = trigger;
++	m_distance = distance;
++}
++
+ QT_END_NAMESPACE
+ 
+ #include "moc_qevent.cpp"
+--- a/src/gui/kernel/qevent.h
++++ b/src/gui/kernel/qevent.h
+@@ -1038,6 +1038,122 @@
+     QWindow *c;
+ };
+ 
++class Q_GUI_EXPORT QControllerEvent : public QEvent
++{
++public:
++    enum EventType
++    {
++		NONE,
++        BUTTON_A,
++        BUTTON_B,
++        BUTTON_X,
++        BUTTON_Y,
++        BUTTON_BACK,
++        BUTTON_GUIDE,
++        BUTTON_START,
++        BUTTON_LEFTSTICK,
++        BUTTON_RIGHTSTICK,
++        BUTTON_LEFTSHOULDER,
++        BUTTON_RIGHTSHOULDER,
++        DPAD,
++        THUMBSTICK_LEFT,
++        THUMBSTICK_RIGHT,
++        TRIGGER_LEFT,
++        TRIGGER_RIGHT,
++    };
++
++    enum Direction
++    {
++        DIRECTION_CENTER,
++        DIRECTION_N,
++        DIRECTION_NE,
++        DIRECTION_E,
++        DIRECTION_SE,
++        DIRECTION_S,
++        DIRECTION_SW,
++        DIRECTION_W,
++        DIRECTION_NW,
++    };
++
++public:
++    QControllerEvent();
++
++	void setButton(EventType button, bool pressed);
++    void setDPad(Direction direction);
++    void setThumbstick(EventType thumbstick, qreal angle, qreal distance);
++    void setTrigger(EventType trigger, qreal distance);
++
++    EventType type() const { return m_type; }
++
++    bool isButton() const { return m_type >= BUTTON_A && m_type <= BUTTON_RIGHTSHOULDER; }
++    bool isButtonPress() const { return isButton() && m_pressed; }
++    bool isButtonRelease() const { return isButton() && !m_pressed; }
++
++    bool isButtonA() const { return m_type == BUTTON_A; }
++    bool isButtonAPress() const { return isButtonA() && m_pressed; }
++    bool isButtonARelease() const { return isButtonA() && !m_pressed; }
++
++    bool isButtonB() const { return m_type == BUTTON_B; }
++    bool isButtonBPress() const { return isButtonB() && m_pressed; }
++    bool isButtonBRelease() const { return isButtonB() && !m_pressed; }
++
++    bool isButtonX() const { return m_type == BUTTON_X; }
++    bool isButtonXPress() const { return isButtonX() && m_pressed; }
++    bool isButtonXRelease() const { return isButtonX() && !m_pressed; }
++
++    bool isButtonY() const { return m_type == BUTTON_Y; }
++    bool isButtonYPress() const { return isButtonY() && m_pressed; }
++    bool isButtonYRelease() const { return isButtonY() && !m_pressed; }
++
++    bool isButtonBack() const { return m_type == BUTTON_BACK; }
++    bool isButtonBackPress() const { return isButtonBack() && m_pressed; }
++    bool isButtonBackRelease() const { return isButtonBack() && !m_pressed; }
++
++    bool isButtonGuide() const { return m_type == BUTTON_GUIDE; }
++    bool isButtonGuidePress() const { return isButtonGuide() && m_pressed; }
++    bool isButtonGuideRelease() const { return isButtonGuide() && !m_pressed; }
++
++    bool isButtonStart() const { return m_type == BUTTON_START; }
++    bool isButtonStartPress() const { return isButtonStart() && m_pressed; }
++    bool isButtonStartRelease() const { return isButtonStart() && !m_pressed; }
++
++    bool isButtonLeftStick() const { return m_type == BUTTON_LEFTSTICK; }
++    bool isButtonLeftStickPress() const { return isButtonLeftStick() && m_pressed; }
++    bool isButtonLeftStickRelease() const { return isButtonLeftStick() && !m_pressed; }
++
++    bool isButtonRightStick() const { return m_type == BUTTON_RIGHTSTICK; }
++    bool isButtonRightStickPress() const { return isButtonRightStick() && m_pressed; }
++    bool isButtonRightStickRelease() const { return isButtonRightStick() && !m_pressed; }
++
++    bool isButtonLeftShoulder() const { return m_type == BUTTON_LEFTSHOULDER; }
++    bool isButtonLeftShoulderPress() const { return isButtonLeftShoulder() && m_pressed; }
++    bool isButtonLeftShoulderRelease() const { return isButtonLeftShoulder() && !m_pressed; }
++
++    bool isButtonRightShoulder() const { return m_type == BUTTON_RIGHTSHOULDER; }
++    bool isButtonRightShoulderPress() const { return isButtonRightShoulder() && m_pressed; }
++    bool isButtonRightShoulderRelease() const { return isButtonRightShoulder() && !m_pressed; }
++
++    bool isDPad() const { return m_type == DPAD; }
++    bool isThumbstick() const { return m_type == THUMBSTICK_LEFT || m_type == THUMBSTICK_RIGHT; }
++    bool isTrigger() const { return m_type == TRIGGER_LEFT || m_type == TRIGGER_RIGHT; }
++
++    qreal angle() const { return m_angle; }
++    qreal distance() const { return m_distance; }
++    Direction direction() const { return m_direction; }
++
++    bool isDirectionUp() const { return m_direction == DIRECTION_NW || m_direction == DIRECTION_N || m_direction == DIRECTION_NE; }
++    bool isDirectionDown() const { return m_direction == DIRECTION_SW || m_direction == DIRECTION_S || m_direction == DIRECTION_SE; }
++    bool isDirectionLeft() const { return m_direction == DIRECTION_NW || m_direction == DIRECTION_W || m_direction == DIRECTION_SW; }
++    bool isDirectionRight() const { return m_direction == DIRECTION_NE || m_direction == DIRECTION_E || m_direction == DIRECTION_SE; }
++
++private:
++    EventType m_type;
++    bool m_pressed;
++    qreal m_angle;
++    qreal m_distance;
++    Direction m_direction;
++};
++
+ QT_END_NAMESPACE
+ 
+ #endif // QEVENT_H
+--- a/src/widgets/dialogs/qdialog.cpp
++++ b/src/widgets/dialogs/qdialog.cpp
+@@ -1079,6 +1079,31 @@
+ #endif
+ }
+ 
++/*! \reimp */
++void QDialog::controllerEvent(QControllerEvent *e)
++{
++    // Don't pass controller events on when a dialog is up
++    e->accept();
++
++    if (e->isButtonAPress() || e->isButtonARelease() || e->isButtonBPress() || e->isButtonBRelease()) {
++        if (e->isButtonAPress()) {
++            QList<QPushButton*> list = findChildren<QPushButton*>();
++            for (int i=0; i<list.size(); ++i) {
++                QPushButton *pb = list.at(i);
++                if (pb->isDefault() && pb->isVisible()) {
++                    if (pb->isEnabled())
++                        pb->click();
++                    return;
++                }
++            }
++        } else if (e->isButtonBPress()) {
++            reject();
++        }
++    } else {
++        QWidget::controllerEvent(e);
++    }
++}
++
+ /*! \fn void QDialog::finished(int result)
+ 
+     This signal is emitted when the dialog's \a result code has been
+--- a/src/widgets/dialogs/qdialog.h
++++ b/src/widgets/dialogs/qdialog.h
+@@ -66,6 +66,7 @@
+ #ifndef QT_NO_CONTEXTMENU
+     void contextMenuEvent(QContextMenuEvent *) override;
+ #endif
++    void controllerEvent(QControllerEvent *) override;
+     bool eventFilter(QObject *, QEvent *) override;
+     void adjustPosition(QWidget*);
+ private:
+--- a/src/widgets/kernel/qwidget.cpp
++++ b/src/widgets/kernel/qwidget.cpp
+@@ -8994,6 +8994,7 @@
+ #if QT_CONFIG(wheelevent)
+         case QEvent::Wheel:
+ #endif
++        case QEvent::Controller:
+             return false;
+         default:
+             break;
+@@ -9446,6 +9447,11 @@
+             d->updateFont(d->data.fnt);
+         d->renderToTextureReallyDirty = 1;
+         break;
++
++    case QEvent::Controller:
++        controllerEvent((QControllerEvent*)event);
++        break;
++
+     case QEvent::DynamicPropertyChange: {
+         const QByteArray &propName = static_cast<QDynamicPropertyChangeEvent *>(event)->propertyName();
+         if (propName.size() == 13 && !qstrncmp(propName, "_q_customDpi", 12)) {
+@@ -10241,6 +10247,25 @@
+ }
+ 
+ /*!
++    \fn void QWidget::controllerEvent(QControllerEvent *event)
++
++    This event handler can be reimplemented in a subclass to receive
++    controller events. The event is passed in the \a event parameter.
++
++    \sa event(), QControllerEvent
++*/
++void QWidget::controllerEvent(QControllerEvent *event)
++{
++    if ((windowType() == Qt::Popup) && (event->isButtonBPress() || event->isButtonBRelease())) {
++        event->accept();
++        if (event->isButtonBRelease())
++            close();
++    } else {
++        event->ignore();
++    }
++}
++
++/*!
+     Ensures that the widget and its children have been polished by
+     QStyle (i.e., have a proper font and palette).
+ 
+--- a/src/widgets/kernel/qwidget.h
++++ b/src/widgets/kernel/qwidget.h
+@@ -58,6 +58,7 @@
+ class QScreen;
+ class QShowEvent;
+ class QHideEvent;
++class QControllerEvent;
+ class QIcon;
+ class QBackingStore;
+ class QPlatformWindow;
+@@ -702,6 +703,8 @@
+ 
+     virtual bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result);
+ 
++    virtual void controllerEvent(QControllerEvent *);
++
+     // Misc. protected functions
+     virtual void changeEvent(QEvent *);
+ 
