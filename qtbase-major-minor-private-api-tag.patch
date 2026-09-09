@@ -1,0 +1,12 @@
+diff -Naur qtbase-everywhere-src-6.11.2.old/cmake/QtFlagHandlingHelpers.cmake qtbase-everywhere-src-6.11.2/cmake/QtFlagHandlingHelpers.cmake
+--- qtbase-everywhere-src-6.11.2.old/cmake/QtFlagHandlingHelpers.cmake	2026-09-09 15:17:22.380441306 +0200
++++ qtbase-everywhere-src-6.11.2/cmake/QtFlagHandlingHelpers.cmake	2026-09-09 15:18:00.865679184 +0200
+@@ -73,7 +73,7 @@
+ 
+         string(APPEND contents "\n};\nQt_${PROJECT_VERSION_MAJOR}")
+         if(QT_FEATURE_elf_private_full_version)
+-            string(APPEND contents ".${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}")
++            string(APPEND contents ".${PROJECT_VERSION_MINOR}")
+         endif()
+         string(APPEND contents "_PRIVATE_API { qt_private_api_tag*;\n")
+         if(arg_PRIVATE_HEADERS)

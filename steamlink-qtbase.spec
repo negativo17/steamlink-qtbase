@@ -10,7 +10,7 @@
 %global qtdir %{_libdir}/steamlink
 
 Name:           steamlink-qtbase
-Version:        6.11.1
+Version:        6.11.2
 Release:        1%{?dist}
 Summary:        Steam Link compatibility package - Qt 6 base libraries
 License:        LGPL-3.0-only OR GPL-3.0-only WITH Qt-GPL-exception-1.0
@@ -20,10 +20,10 @@ Source0:        https://download.qt.io/archive/qt/6.11/%{version}/submodules/qtb
 
 # Valve's QControllerEvent extension, extracted from the Steam Link Flatpak:
 # https://github.com/flathub/com.valvesoftware.SteamLink/blob/beta/patches/steamlink/qtbase.patch
-Patch0:         qtbase-6.11.1-steamlink-controller-event.patch
+Patch0:         qtbase-steamlink-controller-event.patch
 
 # Match the ELF private API version node used by the Fedora Qt 6 build.
-Patch1:         qtbase-6.11.1-major-minor-private-api-tag.patch
+Patch1:         qtbase-major-minor-private-api-tag.patch
 
 ExclusiveArch:  x86_64
 
@@ -220,5 +220,8 @@ fi
 %{qtdir}/plugins/
 
 %changelog
+* Wed Sep 09 2026 Simone Caronni <negativo17@gmail.com> - 6.11.2-1
+- Update to 6.11.2.
+
 * Sat Aug 22 2026 Simone Caronni <negativo17@gmail.com> - 6.11.1-1
 - First build.
